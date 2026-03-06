@@ -59,7 +59,7 @@ const DashboardEngine = () => {
 
     // Derived options from data
     const availableEmpresas = useMemo(() => {
-        return [...new Set(records.map(r => r.EMPRESA))].filter(Boolean);
+        return [...new Set(records.map(r => r.EMPRESA))].filter(Boolean).sort((a, b) => a.localeCompare(b));
     }, [records]);
 
     const availableContratos = useMemo(() => {

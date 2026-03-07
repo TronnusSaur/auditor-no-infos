@@ -58,6 +58,24 @@ const DashboardEngine = () => {
     };
 
     // Derived options from data
+    const handleRecordUpdate = (id, field, value) => {
+        setRecords(prev => prev.map(r => {
+            if (r.ID === id) {
+                const updated = { ...r, [field]: value };
+                // Auto-calculate M2TOTAL
+                const largo = parseFloat(updated.LARGO) || 0;
+                const ancho = parseFloat(updated.ANCHO) || 0;
+                if (largo > 0 && ancho > 0) {
+                    updated.M2TOTAL = (largo * ancho).toFixed(2);
+                } else {
+                    updated.M2TOTAL = 0;
+                }
+                return updated;
+            }
+            return r;
+        }));
+    };
+
     const availableEmpresas = useMemo(() => {
         return [...new Set(records.map(r => r.EMPRESA))].filter(Boolean).sort((a, b) => a.localeCompare(b));
     }, [records]);
@@ -121,6 +139,72 @@ const DashboardEngine = () => {
             <tspan x={cx} y={cy + 15} fontSize="10" fill="#64748b" fontWeight="bold">TOTAL</tspan>
         </text>
     );
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        // 1. Header
+        doc.setTextColor(140, 28, 63); // #8c1c3f
+        doc.setFontSize(22);
+        doc.text('Resumen Ejecutivo de Auditoría Global', 20, 25);
+
+        doc.setTextColor(100, 116, 139); // Slate-500
+        doc.setFontSize(10);
+        doc.text('GOBIERNO MUNICIPAL DE TOLUCA - CONTROL DE BACHEO', 20, 32);
+
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 35, pageWidth - 20, 35);
+
+        doc.setTextColor(30, 41, 59); // Slate-800
+        doc.setFontSize(11);
+        doc.text(`Total de registros auditados: ${stats.total}`, 20, 45);
+
+        // 2. Summary Table (KPIs)
+        const summaryData = [
+            ['Categoría de Error', 'Cantidad', '% del Total'],
+            ['Sin Carpeta / Vacía', stats.vacios, `${((stats.vacios / stats.total) * 100).toFixed(1)}%`],
+            ['No Ejecutado', stats.noEjecutados, `${((stats.noEjecutados / stats.total) * 100).toFixed(1)}%`],
+            ['Con Información', stats.conInfo, `${((stats.conInfo / stats.total) * 100).toFixed(1)}%`]
+        ];
+
+        autoTable(doc, {
+            startY: 55,
+            head: [summaryData[0]],
+            body: summaryData.slice(1),
+            theme: 'striped',
+            headStyles: { fillColor: [140, 28, 63], textColor: [255, 255, 255], fontStyle: 'bold' },
+            styles: { fontSize: 9, cellPadding: 3 },
+            margin: { left: 20, right: 20 }
+        });
+
+        // 3. Breakdown by Company Table
+        doc.setTextColor(140, 28, 63);
+        doc.setFontSize(14);
+        doc.text('Desglose por Empresa', 20, doc.lastAutoTable.finalY + 15);
+
+        const companies = [...new Set(globalFilteredRecords.map(r => r.EMPRESA))].filter(Boolean).sort();
+        const breakdownData = companies.map(emp => {
+            const empRecords = globalFilteredRecords.filter(r => r.EMPRESA === emp);
+            const v = empRecords.filter(r => getFolioStatus(r) === 'VACÍO').length;
+            const n = empRecords.filter(r => getFolioStatus(r) === 'NO EJECUTADO').length;
+            const c = empRecords.filter(r => getFolioStatus(r) === 'CON INFO').length;
+            return [emp, n, v, c, empRecords.length];
+        });
+
+        autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 20,
+            head: [['Empresa', 'No Ejecutados', 'Vacíos', 'Con Info', 'Total']],
+            body: breakdownData,
+            theme: 'grid',
+            headStyles: { fillColor: [140, 28, 63], textColor: [255, 255, 255], fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 2, halign: 'center' },
+            columnStyles: { 0: { halign: 'left', fontStyle: 'bold' }, 4: { textColor: [140, 28, 63], fontStyle: 'bold' } },
+            margin: { left: 20, right: 20 }
+        });
+
+        doc.save(`Resumen_Auditoria_${new Date().getTime()}.pdf`);
+    };
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 transition-colors duration-300 min-h-screen text-slate-800 dark:text-slate-100 font-sans">
@@ -346,7 +430,10 @@ const DashboardEngine = () => {
                                         ))}
                                     </div>
                                 </div>
-                                <button className="px-3 py-1.5 bg-[#8c1c3f] hover:bg-[#6c1430] text-white text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap">
+                                <button
+                                    onClick={handleExportPDF}
+                                    className="px-3 py-1.5 bg-[#8c1c3f] hover:bg-[#6c1430] text-white text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
+                                >
                                     <span className="material-symbols-outlined text-lg">download</span>
                                     Exportar PDF
                                 </button>
@@ -360,6 +447,7 @@ const DashboardEngine = () => {
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Estado</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">Largo</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">Ancho</th>
+                                            <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">M2 Total</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Empresa + Contrato</th>
                                         </tr>
                                     </thead>
@@ -380,8 +468,27 @@ const DashboardEngine = () => {
                                                     <td className="px-4 py-3">
                                                         {getBadge(status)}
                                                     </td>
-                                                    <td className="px-4 py-3 text-[12px] text-slate-600 dark:text-slate-400 hidden sm:table-cell">{r.LARGO || 'N/A'}</td>
-                                                    <td className="px-4 py-3 text-[12px] text-slate-600 dark:text-slate-400 hidden sm:table-cell">{r.ANCHO || 'N/A'}</td>
+                                                    <td className="px-4 py-3 hidden sm:table-cell">
+                                                        <input
+                                                            type="text"
+                                                            value={r.LARGO || ''}
+                                                            onChange={(e) => handleRecordUpdate(r.ID, 'LARGO', e.target.value)}
+                                                            className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 hidden sm:table-cell">
+                                                        <input
+                                                            type="text"
+                                                            value={r.ANCHO || ''}
+                                                            onChange={(e) => handleRecordUpdate(r.ID, 'ANCHO', e.target.value)}
+                                                            className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-[12px] font-bold text-[#8c1c3f] hidden sm:table-cell">
+                                                        {r.M2TOTAL || '0.00'}
+                                                    </td>
                                                     <td className="px-4 py-3 text-[12px] text-slate-500 dark:text-slate-400 uppercase tracking-tight">
                                                         {r.EMPRESA && r.ID ? `${r.EMPRESA} - ${r.ID}` : r.EMPRESA || r.ID || 'N/A'}
                                                     </td>

@@ -10,7 +10,7 @@ import {
     Search, Download, Filter, ChevronDown, List,
     AlertCircle, CheckCircle2, CircleDashed
 } from 'lucide-react';
-import { fetchSheetData } from '../services/sheetsApi';
+import { fetchSheetData, updateSheetRow } from '../services/sheetsApi';
 import { DASHBOARD_CONFIG } from '../../dashboard.config';
 
 const DashboardEngine = () => {
@@ -61,7 +61,13 @@ const DashboardEngine = () => {
     const handleRecordUpdate = (id, field, value) => {
         setRecords(prev => prev.map(r => {
             if (r.ID === id) {
-                const updated = { ...r, [field]: value };
+                let updated = { ...r, [field]: value };
+
+                // Logic: If TIPO changes, update PROFUNDIDAD (0.07 vs 0.1)
+                if (field === 'TIPO') {
+                    updated.PROFUNDIDAD = (value === 'SUPERFICIAL') ? 0.07 : 0.1;
+                }
+
                 // Auto-calculate M2TOTAL
                 const largo = parseFloat(updated.LARGO) || 0;
                 const ancho = parseFloat(updated.ANCHO) || 0;
@@ -74,6 +80,26 @@ const DashboardEngine = () => {
             }
             return r;
         }));
+    };
+
+    const handleSyncRow = async (id) => {
+        const record = records.find(r => r.ID === id);
+        if (!record) return;
+
+        // Map UI status back to Sheet columns if necessary
+        // In this case, we update LARGO, ANCHO, TIPO, PROFUNDIDAD
+        const updates = {
+            LARGO: record.LARGO,
+            ANCHO: record.ANCHO,
+            TIPO: record.TIPO,
+            PROFUNDIDAD: record.PROFUNDIDAD
+        };
+
+        try {
+            await updateSheetRow(id, updates);
+        } catch (error) {
+            console.error("DashboardEngine: Error syncing row:", error);
+        }
     };
 
     const availableEmpresas = useMemo(() => {
@@ -447,6 +473,7 @@ const DashboardEngine = () => {
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Estado</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">Largo</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">Ancho</th>
+                                            <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">TIPO (Profundidad)</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold hidden sm:table-cell">M2 Total</th>
                                             <th className="px-4 py-3 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Empresa + Contrato</th>
                                         </tr>
@@ -473,6 +500,7 @@ const DashboardEngine = () => {
                                                             type="text"
                                                             value={r.LARGO || ''}
                                                             onChange={(e) => handleRecordUpdate(r.ID, 'LARGO', e.target.value)}
+                                                            onBlur={() => handleSyncRow(r.ID)}
                                                             className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
                                                             placeholder="0.00"
                                                         />
@@ -482,9 +510,24 @@ const DashboardEngine = () => {
                                                             type="text"
                                                             value={r.ANCHO || ''}
                                                             onChange={(e) => handleRecordUpdate(r.ID, 'ANCHO', e.target.value)}
+                                                            onBlur={() => handleSyncRow(r.ID)}
                                                             className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
                                                             placeholder="0.00"
                                                         />
+                                                    </td>
+                                                    <td className="px-4 py-3 hidden sm:table-cell">
+                                                        <select
+                                                            value={r.TIPO || 'SUPERFICIAL'}
+                                                            onChange={(e) => {
+                                                                handleRecordUpdate(r.ID, 'TIPO', e.target.value);
+                                                                // Immediate sync for select
+                                                                setTimeout(() => handleSyncRow(r.ID), 0);
+                                                            }}
+                                                            className="bg-transparent border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none cursor-pointer"
+                                                        >
+                                                            <option value="SUPERFICIAL">SUPERFICIAL (0.07)</option>
+                                                            <option value="PROFUNDO">PROFUNDO (0.10)</option>
+                                                        </select>
                                                     </td>
                                                     <td className="px-4 py-3 text-[12px] font-bold text-[#8c1c3f] hidden sm:table-cell">
                                                         {r.M2TOTAL || '0.00'}

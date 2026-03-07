@@ -181,7 +181,7 @@ const DashboardEngine = () => {
                 {/* Sección A: Encabezado de Página y Filtros */}
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 border-b border-slate-200 dark:border-slate-800 pb-6">
                     <div>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Panel de Control de Documentación</h3>
+                        <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 italic">Panel de Control de Folios sin Información</h3>
                         <p className="text-slate-500 dark:text-slate-400 mt-1">Estado actual de folios y seguimiento de incidencias administrativas.</p>
                     </div>
 

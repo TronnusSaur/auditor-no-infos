@@ -63,14 +63,18 @@ const DashboardEngine = () => {
             if (r.ID === id) {
                 let updated = { ...r, [field]: value };
 
-                // Logic: If TIPO changes, update PROFUNDIDAD (0.07 vs 0.1)
+                // Logic: If TIPO changes, update PROFUNDIDAD
                 if (field === 'TIPO') {
-                    updated.PROFUNDIDAD = (value === 'SUPERFICIAL') ? 0.07 : 0.1;
+                    if (value === 'SUPERFICIAL') updated.PROFUNDIDAD = 0.07;
+                    else if (value === 'PROFUNDO') updated.PROFUNDIDAD = 0.10;
+                    else updated.PROFUNDIDAD = 0;
                 }
 
-                // Auto-calculate M2TOTAL
-                const largo = parseFloat(updated.LARGO) || 0;
-                const ancho = parseFloat(updated.ANCHO) || 0;
+                // Auto-calculate M2TOTAL with robust float parsing (handles dots and commas)
+                const parseF = (v) => parseFloat(String(v || '0').replace(',', '.')) || 0;
+                const largo = parseF(updated.LARGO);
+                const ancho = parseF(updated.ANCHO);
+
                 if (largo > 0 && ancho > 0) {
                     updated.M2TOTAL = (largo * ancho).toFixed(2);
                 } else {
@@ -86,13 +90,13 @@ const DashboardEngine = () => {
         const record = records.find(r => r.ID === id);
         if (!record) return;
 
-        // Map UI status back to Sheet columns if necessary
-        // In this case, we update LARGO, ANCHO, TIPO, PROFUNDIDAD
+        // Map UI status back to Sheet columns
         const updates = {
             LARGO: record.LARGO,
             ANCHO: record.ANCHO,
-            TIPO: record.TIPO,
-            PROFUNDIDAD: record.PROFUNDIDAD
+            TIPO: (record.TIPO === 'NONE' || !record.TIPO) ? '' : record.TIPO,
+            PROFUNDIDAD: record.PROFUNDIDAD,
+            M2TOTAL: record.M2TOTAL
         };
 
         try {
@@ -517,20 +521,21 @@ const DashboardEngine = () => {
                                                     </td>
                                                     <td className="px-4 py-3 hidden sm:table-cell">
                                                         <select
-                                                            value={r.TIPO || 'SUPERFICIAL'}
+                                                            value={r.TIPO || 'NONE'}
                                                             onChange={(e) => {
                                                                 handleRecordUpdate(r.ID, 'TIPO', e.target.value);
                                                                 // Immediate sync for select
-                                                                setTimeout(() => handleSyncRow(r.ID), 0);
+                                                                setTimeout(() => handleSyncRow(r.ID), 50);
                                                             }}
                                                             className="bg-transparent border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none cursor-pointer"
                                                         >
+                                                            <option value="NONE" className="text-slate-400">-- SELECCIÓN --</option>
                                                             <option value="SUPERFICIAL">SUPERFICIAL (0.07)</option>
                                                             <option value="PROFUNDO">PROFUNDO (0.10)</option>
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3 text-[12px] font-bold text-[#8c1c3f] hidden sm:table-cell">
-                                                        {r.M2TOTAL || '0.00'}
+                                                        {parseFloat(r.M2TOTAL || '0').toFixed(2)}
                                                     </td>
                                                     <td className="px-4 py-3 text-[12px] text-slate-500 dark:text-slate-400 uppercase tracking-tight">
                                                         {r.EMPRESA && r.ID ? `${r.EMPRESA} - ${r.ID}` : r.EMPRESA || r.ID || 'N/A'}

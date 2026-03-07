@@ -59,18 +59,20 @@ const DashboardEngine = () => {
 
     // Derived options from data
     const handleRecordUpdate = (id, field, value) => {
+        let updatedRecord = null;
         setRecords(prev => prev.map(r => {
             if (r.ID === id) {
                 let updated = { ...r, [field]: value };
 
                 // Logic: If TIPO changes, update PROFUNDIDAD
                 if (field === 'TIPO') {
-                    if (value === 'SUPERFICIAL') updated.PROFUNDIDAD = 0.07;
-                    else if (value === 'PROFUNDO') updated.PROFUNDIDAD = 0.10;
+                    const normValue = String(value).toUpperCase();
+                    if (normValue === 'SUPERFICIAL') updated.PROFUNDIDAD = 0.07;
+                    else if (normValue === 'PROFUNDO') updated.PROFUNDIDAD = 0.10;
                     else updated.PROFUNDIDAD = 0;
                 }
 
-                // Auto-calculate M2TOTAL with robust float parsing (handles dots and commas)
+                // Auto-calculate M2TOTAL with robust float parsing
                 const parseF = (v) => parseFloat(String(v || '0').replace(',', '.')) || 0;
                 const largo = parseF(updated.LARGO);
                 const ancho = parseF(updated.ANCHO);
@@ -80,27 +82,28 @@ const DashboardEngine = () => {
                 } else {
                     updated.M2TOTAL = 0;
                 }
+                updatedRecord = updated;
                 return updated;
             }
             return r;
         }));
+        return updatedRecord;
     };
 
-    const handleSyncRow = async (id) => {
-        const record = records.find(r => r.ID === id);
+    const handleSyncRow = async (record) => {
         if (!record) return;
 
         // Map UI status back to Sheet columns
         const updates = {
-            LARGO: record.LARGO,
-            ANCHO: record.ANCHO,
-            TIPO: (record.TIPO === 'NONE' || !record.TIPO) ? '' : record.TIPO,
-            PROFUNDIDAD: record.PROFUNDIDAD,
-            M2TOTAL: record.M2TOTAL
+            LARGO: record.LARGO || '',
+            ANCHO: record.ANCHO || '',
+            TIPO: (String(record.TIPO || '').toUpperCase() === 'NONE' || !record.TIPO) ? '' : record.TIPO,
+            PROFUNDIDAD: record.PROFUNDIDAD || 0,
+            M2TOTAL: record.M2TOTAL || 0
         };
 
         try {
-            await updateSheetRow(id, updates);
+            await updateSheetRow(record.ID, updates);
         } catch (error) {
             console.error("DashboardEngine: Error syncing row:", error);
         }
@@ -504,7 +507,10 @@ const DashboardEngine = () => {
                                                             type="text"
                                                             value={r.LARGO || ''}
                                                             onChange={(e) => handleRecordUpdate(r.ID, 'LARGO', e.target.value)}
-                                                            onBlur={() => handleSyncRow(r.ID)}
+                                                            onBlur={(e) => {
+                                                                const updated = handleRecordUpdate(r.ID, 'LARGO', e.target.value);
+                                                                handleSyncRow(updated);
+                                                            }}
                                                             className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
                                                             placeholder="0.00"
                                                         />
@@ -514,18 +520,20 @@ const DashboardEngine = () => {
                                                             type="text"
                                                             value={r.ANCHO || ''}
                                                             onChange={(e) => handleRecordUpdate(r.ID, 'ANCHO', e.target.value)}
-                                                            onBlur={() => handleSyncRow(r.ID)}
+                                                            onBlur={(e) => {
+                                                                const updated = handleRecordUpdate(r.ID, 'ANCHO', e.target.value);
+                                                                handleSyncRow(updated);
+                                                            }}
                                                             className="w-16 bg-transparent border-b border-slate-200 dark:border-slate-700 text-[12px] text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none transition-colors px-1"
                                                             placeholder="0.00"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3 hidden sm:table-cell">
                                                         <select
-                                                            value={r.TIPO || 'NONE'}
+                                                            value={String(r.TIPO || '').toUpperCase() || 'NONE'}
                                                             onChange={(e) => {
-                                                                handleRecordUpdate(r.ID, 'TIPO', e.target.value);
-                                                                // Immediate sync for select
-                                                                setTimeout(() => handleSyncRow(r.ID), 50);
+                                                                const updated = handleRecordUpdate(r.ID, 'TIPO', e.target.value);
+                                                                handleSyncRow(updated);
                                                             }}
                                                             className="bg-transparent border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 focus:border-[#8c1c3f] outline-none cursor-pointer"
                                                         >
@@ -535,7 +543,10 @@ const DashboardEngine = () => {
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-3 text-[12px] font-bold text-[#8c1c3f] hidden sm:table-cell">
-                                                        {parseFloat(r.M2TOTAL || '0').toFixed(2)}
+                                                        {(() => {
+                                                            const parseF = (v) => parseFloat(String(v || '0').replace(',', '.')) || 0;
+                                                            return parseF(r.M2TOTAL).toFixed(2);
+                                                        })()}
                                                     </td>
                                                     <td className="px-4 py-3 text-[12px] text-slate-500 dark:text-slate-400 uppercase tracking-tight">
                                                         {r.EMPRESA && r.ID ? `${r.EMPRESA} - ${r.ID}` : r.EMPRESA || r.ID || 'N/A'}

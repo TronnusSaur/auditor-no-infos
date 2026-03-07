@@ -8,7 +8,7 @@ const SHEET_ID = '1XsAB-ADnF8xqFOvsW9w9PGDCDI51OJbvYPVyFXTZ9j8';
 const SHEET_NAME = '2. REGISTRO 1RA ETAPA - (NO INFOS)';
 
 // Replace this with your deployed Apps Script URL
-const APPS_SCRIPT_URL = '';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGuwS1D2IjGkXZdXZnfj9Mc75xNtKcPpMDDYHMT55VYPl5uu4G1IM5Di6Grkcy16Rerg/exec';
 
 export const fetchSheetData = async () => {
     try {

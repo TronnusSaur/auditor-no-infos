@@ -17,7 +17,7 @@ export const fetchSheetData = async () => {
         const text = await response.text();
         const jsonData = JSON.parse(text.substring(47).slice(0, -2));
 
-        const cols = jsonData.table.cols.map(c => c.label || c.id);
+        const cols = jsonData.table.cols.map(c => (c.label || c.id || '').trim());
         const rows = jsonData.table.rows.map(row => {
             const item = {};
             row.c.forEach((cell, i) => {

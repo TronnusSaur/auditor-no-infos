@@ -21,27 +21,40 @@ function doPost(e) {
     const rows = sheet.getDataRange().getValues();
     const headers = rows[0];
     
+    // Normalized headers (trimmed and uppercase)
+    const normHeaders = headers.map(h => String(h || '').trim().toUpperCase());
+
     // Find column index for ID
-    const idColIndex = headers.indexOf('ID');
+    const idColIndex = normHeaders.indexOf('ID');
     if (idColIndex === -1) throw new Error('Column ID not found');
     
     // Find row by ID
     let rowIndex = -1;
     for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][idColIndex]) === String(id)) {
-        rowIndex = i + 1; // 1-indexed for sheets
-        break;
-      }
+        const rowId = String(rows[i][idColIndex]).trim();
+        if (rowId === String(id).trim()) {
+            rowIndex = i + 1; // 1-indexed for sheets
+            break;
+        }
     }
     
     if (rowIndex === -1) throw new Error('Record with ID ' + id + ' not found');
     
     // Process updates
     for (let colName in updates) {
-      const colIndex = headers.indexOf(colName);
-      if (colIndex !== -1) {
-        sheet.getRange(rowIndex, colIndex + 1).setValue(updates[colName]);
-      }
+        let targetCol = colName.trim().toUpperCase();
+        
+        // Handle the ROFUNDIDA typo or missing letters in headers
+        let colIndex = normHeaders.indexOf(targetCol);
+        
+        // Final fallback: if target is PROFUNDIDAD, also try finding ROFUNDIDA
+        if (colIndex === -1 && targetCol === 'PROFUNDIDAD') {
+            colIndex = normHeaders.findIndex(h => h.includes('ROFUNDIDA'));
+        }
+
+        if (colIndex !== -1) {
+            sheet.getRange(rowIndex, colIndex + 1).setValue(updates[colName]);
+        }
     }
     
     return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
